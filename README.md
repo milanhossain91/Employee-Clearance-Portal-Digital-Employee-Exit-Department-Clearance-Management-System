@@ -1,0 +1,2 @@
+# Employee-Clearance-Portal-Digital-Employee-Exit-Department-Clearance-Management-System
+A modern Employee Clearance Portal built with Laravel, Vue.js, MySQL, REST API, and Tailwind CSS for automating employee resignation, exit clearance, department approvals, asset recovery, finance clearance, HR workflows, and digital employee offboarding. Supports multi-business operations, real-time clearance tracking.
