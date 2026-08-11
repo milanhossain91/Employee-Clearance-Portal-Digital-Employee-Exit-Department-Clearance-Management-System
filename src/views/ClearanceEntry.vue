@@ -93,6 +93,15 @@ async function searchEmployers({ query }) {
   }
 }
 
+// Serial order of the read-only employee panel.
+const employeeFields = [
+  { label: 'Staff Name', key: 'name' },
+  { label: 'Business', key: 'business' },
+  { label: 'Designation', key: 'designation' },
+  { label: 'Department', key: 'department' },
+  { label: 'Joining Date', key: 'joiningDate' },
+]
+
 function employerLabel(row) {
   return row ? `${row.EmpCode} - ${row.Name}` : ''
 }
@@ -105,8 +114,12 @@ async function onEmployerSelected({ value }) {
   staffInfo.value = {
     empCode: value.EmpCode,
     name: value.Name || '—',
+    // PIMS resolves the business through the employee's department. Contractual
+    // staff sit in `contEmpHist`, which has no department master to join to, so
+    // it comes back null for them.
+    business: value.BusinessName || '—',
     designation: value.DesgName || '—',
-    department: value.DeptCode || '—',
+    department: value.DeptName || value.DeptCode || '—',
     joiningDate: value.JoiningDate || '—',
   }
   await checkExistingClearance(value.EmpCode)
@@ -158,7 +171,7 @@ function missingFields() {
   }
   if (!formType.value) missing.push('Form Type')
   if (!hrsReceivingDate.value) missing.push('HRS Receiving Date')
-  if (!resignDate.value) missing.push('Resign Date')
+  if (!resignDate.value) missing.push('Resignation Effective Date')
   return missing
 }
 
@@ -273,19 +286,11 @@ async function submitClearance() {
         </AutoComplete>
       </div>
 
-      <div class="mb-4.5">
-        <label class="readonly-label">Staff Name</label>
-        <div class="readonly-value">{{ staffInfo?.name || '' }}</div>
-      </div>
-
-      <div class="mb-4.5">
-        <label class="readonly-label">Designation</label>
-        <div class="readonly-value">{{ staffInfo?.designation || '' }}</div>
-      </div>
-
-      <div class="mb-4.5">
-        <label class="readonly-label">Joining Date</label>
-        <div class="readonly-value">{{ staffInfo?.joiningDate || '' }}</div>
+      <!-- Order fixed by the form: name, business, designation, department,
+           joining date. All read-only — they come from PIMS, not the operator. -->
+      <div v-for="field in employeeFields" :key="field.key" class="mb-4.5">
+        <label class="readonly-label">{{ field.label }}</label>
+        <div class="readonly-value">{{ staffInfo?.[field.key] || '' }}</div>
       </div>
 
       <p
@@ -322,7 +327,7 @@ async function submitClearance() {
           />
         </div>
         <div>
-          <label class="field-label">Resign Date <span class="req">*</span></label>
+          <label class="field-label">Resignation Effective Date <span class="req">*</span></label>
           <DatePicker
             v-model="resignDate"
             dateFormat="mm/dd/yy"

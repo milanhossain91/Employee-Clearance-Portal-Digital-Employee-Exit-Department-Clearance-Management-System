@@ -51,7 +51,7 @@ const employeeFields = [
   { label: 'Business', key: 'business' },
   { label: 'Staff ID', key: 'staffId' },
   { label: 'Staff Name', key: 'staffName' },
-  { label: 'Resigned Date', key: 'resignedDate' },
+  { label: 'Resignation Effective Date', key: 'resignedDate' },
   { label: 'Online Submission', key: 'onlineSubmission' },
   { label: 'Pending At', key: 'pendingAt' },
   { label: 'Status', key: 'status' },
@@ -108,8 +108,11 @@ function applyClearance(clearance) {
       mandatory: Boolean(d.is_mandatory),
       submission: parseDate(d.submission_date),
       received: parseDate(d.received_date),
+      resubmission: parseDate(d.resubmission_date),
+      // Server-computed: days the form has been with this department. Read-only.
+      dayCount: d.day_count,
       returned: d.is_returned ? 'Yes' : 'No',
-      remarks: d.remarks ?? null,
+      remarks: d.remarks ?? '',
     })
   }
 }
@@ -201,8 +204,36 @@ function onReceivedChange(dept, value) {
   if (value && dept.returned === 'Yes') dept.returned = 'No'
 }
 
+// `departmentRowError()` on the API refuses a returned department that has no
+// resubmission date or no remarks, and rejects the whole request on the first
+// bad row. Mirror both rules here so the problem is named per department up
+// front, instead of coming back one row at a time.
+function returnedIssues() {
+  const issues = []
+  for (const d of deptState) {
+    if (d.returned !== 'Yes') continue
+    const missing = []
+    if (!d.resubmission) missing.push('Resubmission Date')
+    if (!String(d.remarks || '').trim()) missing.push('Remarks')
+    if (missing.length) issues.push(`${d.name} (${missing.join(' + ')})`)
+  }
+  return issues
+}
+
 async function saveUpdate() {
   if (!clearanceId.value) return
+
+  const issues = returnedIssues()
+  if (issues.length) {
+    notify(
+      'warn',
+      'Update not saved',
+      `Returned departments need a Resubmission Date and Remarks — ${issues.join('; ')}.`,
+      8000
+    )
+    return
+  }
+
   saving.value = true
   saved.value = false
   try {
@@ -210,8 +241,9 @@ async function saveUpdate() {
       department_id: d.department_id,
       submission_date: formatDate(d.submission),
       received_date: formatDate(d.received),
+      resubmission_date: formatDate(d.resubmission),
       is_returned: d.returned === 'Yes',
-      remarks: d.remarks || null,
+      remarks: d.remarks?.trim() || null,
     }))
     // The overall note lives on the clearance itself, so it saves through the
     // header endpoint. Do it first: the department save recalculates status and
@@ -368,6 +400,21 @@ async function saveUpdate() {
               </span>
             </div>
 
+            <!-- Server-computed: days from submission to receipt, or to today
+                 while still outstanding. Null until the form is submitted. -->
+            <div
+              v-if="dept.dayCount !== null && dept.dayCount !== undefined"
+              class="mb-3 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2"
+            >
+              <span class="text-[12.5px] text-slate-500">Days with department</span>
+              <span
+                class="text-[13px] font-semibold"
+                :class="dept.received ? 'text-green-600' : 'text-slate-700'"
+              >
+                {{ dept.dayCount }}
+              </span>
+            </div>
+
             <div class="mb-3">
               <label class="mb-1.5 block text-[12.5px] font-medium text-slate-600">
                 Date of Submission
@@ -410,6 +457,48 @@ async function saveUpdate() {
                 @update:modelValue="onReturnedChange(dept, $event)"
               />
             </div>
+
+            <!-- Only meaningful once the form has come back to the employee. -->
+            <template v-if="dept.returned === 'Yes'">
+              <div class="mt-3.5">
+                <label class="mb-1.5 block text-[12.5px] font-medium text-slate-600">
+                  Date of Resubmission <span class="req">*</span>
+                </label>
+                <DatePicker
+                  v-model="dept.resubmission"
+                  dateFormat="mm/dd/yy"
+                  placeholder="mm/dd/yyyy"
+                  showIcon
+                  iconDisplay="input"
+                  class="w-full"
+                  :invalid="!dept.resubmission"
+                  :minDate="dept.submission || undefined"
+                />
+                <p v-if="!dept.resubmission" class="mt-1.5 text-[11.5px] font-medium text-red-500">
+                  Required for a returned department.
+                </p>
+              </div>
+
+              <div class="mt-3">
+                <label class="mb-1.5 block text-[12.5px] font-medium text-slate-600">
+                  Remarks <span class="req">*</span>
+                </label>
+                <Textarea
+                  v-model="dept.remarks"
+                  rows="2"
+                  maxlength="255"
+                  class="w-full"
+                  :invalid="!String(dept.remarks || '').trim()"
+                  placeholder="Why was this form returned?"
+                />
+                <p
+                  v-if="!String(dept.remarks || '').trim()"
+                  class="mt-1.5 text-[11.5px] font-medium text-red-500"
+                >
+                  Required for a returned department.
+                </p>
+              </div>
+            </template>
           </motion.div>
         </div>
 

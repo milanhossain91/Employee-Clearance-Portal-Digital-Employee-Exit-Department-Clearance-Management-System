@@ -157,7 +157,7 @@ const EMPLOYEE_HEADERS = [
   'Staff ID',
   'Staff Name',
   'Designation',
-  'Resign Date',
+  'Resignation Effective Date',
   'HRS Receiving Date',
   'Online Submission Date',
   'Status',
@@ -396,7 +396,7 @@ const showingLabel = computed(() => {
             <Column header="Staff ID" />
             <Column header="Staff Name" />
             <Column header="Designation" />
-            <Column header="Resign Date" />
+            <Column header="Resignation Effective Date" />
             <Column header="HRS Receiving" />
             <Column header="Submission" />
             <Column header="Status" />
@@ -434,7 +434,7 @@ const showingLabel = computed(() => {
         <Column header="Designation">
           <template #body="{ data }">{{ data.staff?.designation ?? '—' }}</template>
         </Column>
-        <Column header="Resign Date">
+        <Column header="Resignation Effective Date">
           <template #body="{ data }">{{ data.resign_date ?? '—' }}</template>
         </Column>
         <Column header="HRS Receiving">
